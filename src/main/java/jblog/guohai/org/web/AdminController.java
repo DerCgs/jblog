@@ -1,10 +1,12 @@
 package jblog.guohai.org.web;
 
+
+import freemarker.template.TemplateModelException;
+import jblog.guohai.org.model.*;
+import jblog.guohai.org.util.Signature;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
-import jblog.guohai.org.model.BlogContent;
-import jblog.guohai.org.model.ClassType;
-import jblog.guohai.org.model.Result;
-import jblog.guohai.org.model.UserModel;
 import jblog.guohai.org.service.AdminService;
 import jblog.guohai.org.service.BlogService;
 import jblog.guohai.org.service.UserService;
@@ -20,13 +22,14 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+
 import java.text.ParseException;
 import java.util.List;
 
 
 @Controller
 @RequestMapping(value = "/admin")
+@ConfigurationProperties
 public class AdminController {
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -46,6 +49,18 @@ public class AdminController {
     @Autowired
     private HttpServletRequest request;
 
+    @Autowired
+    private freemarker.template.Configuration configuration;
+
+    @Autowired
+    Signature signature;
+
+    /**
+     * 上传是否需要回调
+     */
+    @Value("${my-data.aliyunoss.is-callback}")
+    private Boolean isCallback;
+
     /**
      * 登录
      * @param model 参数
@@ -58,17 +73,49 @@ public class AdminController {
 
     @ResponseBody
     @RequestMapping(value = "/login")
-    public Result<String> adminLogin(Model model,@RequestBody UserModel user) {
-        Result<String> result = userService.checkUserPass(user.getUserName(), user.getUserPass());
+    public Result<String> adminLogin(Model model,@RequestBody UserModel user) throws TemplateModelException {
+        Result<UserModel> result = userService.checkUserPass(user.getUserName(), user.getUserPass());
         if (result.isStatus()) {
-            Cookie userCook = new Cookie("user", result.getData());
+            Cookie userCook = new Cookie("user", result.getData().getUserUUID());
             //登录状态过期时间20分钟
             userCook.setMaxAge(1800);
             response.addCookie(userCook);
+            configuration.setSharedVariable("user_name", result.getData().getUserName());
+            configuration.setSharedVariable("user_avatar", result.getData().getUserAvatar());
             return new Result<String>(true, "登录成功");
         }else{
-            return new Result<String>(false, result.getData());
+            return new Result<String>(false, "登录失败");
         }
+    }
+
+    /**
+     *
+     * 注销方法，删除COOKIES，删除MAP内对应成员
+     * @param model
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/logout")
+    public  Result<String> adminLogout(Model model) {
+        String uuid = null;
+        if (null == request.getCookies()) {
+
+            return new Result<>(false,"没有找到cookie");
+        }
+        for (Cookie cookie : request.getCookies()) {
+            if (cookie.getName().equals("user")) {
+                uuid = cookie.getValue();
+                cookie.setValue(null);
+                cookie.setMaxAge(0);
+                response.addCookie(cookie);
+                break;
+            }
+        }
+        if (null == uuid) {
+
+            return new Result<>(false,"uuid为空");
+        }
+        return userService.logoutUser(uuid);
     }
 
     @RequestMapping(value = "/main")
@@ -151,6 +198,11 @@ public class AdminController {
         return adminService.delPostBlog(blog.getPostCode());
     }
 
+    /**
+     * 更新密码接口
+     * @param inUser
+     * @return
+     */
     @ResponseBody
     @RequestMapping(value = "/updatepass")
     public Result<String> updatePassword(@RequestBody UserModel inUser) {
@@ -240,17 +292,62 @@ public class AdminController {
         return blogService.addClass(className);
     }
 
-
+    /**
+     * 热词界面
+     * @param model
+     * @return
+     */
     @RequestMapping(value = "/hotkey")
     public String adminHotkey(Model model) {
         model.addAttribute("hotkey_list", blogService.getHotkeyList());
         return "admin/hotkey";
     }
 
+    /**
+     * 重新组建热词接口
+     * @return
+     */
     @ResponseBody
     @RequestMapping(value = "/hotkey/renew",method = RequestMethod.POST)
     public Result<String> renewHotkey(){
         return adminService.renewHotkey();
     }
 
+    /**
+     * 获得阿里云OSS服务签名
+     *
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/alioss")
+    public AliyunOssSignature getOSSPolicy() {
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST");
+        UserModel user = UserServiceImpl.getUserByCookie(request);
+        AliyunOssSignature aliSign = signature.AliOssSignature("avatar",String.valueOf(user.getUserCode())).getData();
+        aliSign.setUser(String.valueOf(user.getUserCode()));
+        return aliSign;
+    }
+
+    /**
+     * 更新头像，如果没有回调同时 更新DB
+     * @param avatarName
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/upload/avatar")
+    public Result<String> uploadAvatarSuccess(@RequestParam("avatar_name") String avatarName) {
+
+        try {
+            configuration.setSharedVariable("user_avatar", avatarName);
+        } catch (TemplateModelException e) {
+            e.printStackTrace();
+        }
+        if(!isCallback) {
+            String parm = "user="+UserServiceImpl.getUserByCookie(request).getUserCode()+"&filename="+avatarName;
+            return userService.setUserAvata(parm);
+        }
+        return new Result<>(true,"success");
+
+    }
 }

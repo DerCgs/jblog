@@ -28,7 +28,7 @@ public class FreemarkerConfig {
      */
     @Setter
     @Getter
-    @Value("${my-data.blog-name}")
+    @Value("${my-data.config.blog-name}")
     private String blogName;
 
     /**
@@ -36,7 +36,7 @@ public class FreemarkerConfig {
      */
     @Setter
     @Getter
-    @Value("${my-data.blog-author}")
+    @Value("${my-data.config.blog-author}")
     private String blogAuthor;
 
     /**
@@ -44,7 +44,7 @@ public class FreemarkerConfig {
      */
     @Setter
     @Getter
-    @Value("${my-data.blog-twitter}")
+    @Value("${my-data.config.blog-twitter}")
     private String blogTwitter;
 
     /**
@@ -52,8 +52,11 @@ public class FreemarkerConfig {
      */
     @Setter
     @Getter
-    @Value("${my-data.blog-qrcode}")
+    @Value("${my-data.config.blog-qrcode}")
     private String blogQRCode;
+
+    @Value("https://${my-data.aliyunoss.bucket}.${my-data.aliyunoss.endpoint}/")
+    private String staticStorage;
 
     @PostConstruct
     public void setSharedVariable() throws TemplateModelException {
@@ -61,5 +64,7 @@ public class FreemarkerConfig {
         configuration.setSharedVariable("blog_author", blogAuthor);
         configuration.setSharedVariable("blog_twitter", blogTwitter);
         configuration.setSharedVariable("blog_qrcode", blogQRCode);
+
+        configuration.setSharedVariable("blog_storage", staticStorage);
     }
 }
