@@ -1,6 +1,7 @@
 package jblog.guohai.org.service;
 
 import jblog.guohai.org.dao.BlogDao;
+import jblog.guohai.org.dao.BlogSearchDao;
 import jblog.guohai.org.dao.HotkeyDao;
 import jblog.guohai.org.dao.UserDao;
 import jblog.guohai.org.model.BlogContent;
@@ -8,10 +9,12 @@ import jblog.guohai.org.model.Hotkey;
 import jblog.guohai.org.model.Result;
 import jblog.guohai.org.model.UserModel;
 import jblog.guohai.org.util.MD5;
+import jblog.guohai.org.util.SplitWord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class AdminServiceImpl implements AdminService {
@@ -24,6 +27,10 @@ public class AdminServiceImpl implements AdminService {
 
     @Autowired
     HotkeyDao hotkeyDao;
+
+    @Autowired
+    BlogSearchDao searchDao;
+
     /**
      * 后台用的页大小
      */
@@ -158,6 +165,10 @@ public class AdminServiceImpl implements AdminService {
                     hotkeyDao.setHotkeyCountAdd1(new Hotkey(key,0));
                 }
             }
+
+            // 分词映射
+            searchDao.insertSearchKey(blog.getPostCode(), SplitWord.split(blog.getPostContent()));
+
             result.setStatus(true);
             result.setData("Success:" + blog.getPostCode());
         } else {

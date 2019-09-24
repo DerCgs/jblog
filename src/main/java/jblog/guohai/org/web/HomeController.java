@@ -3,10 +3,13 @@ package jblog.guohai.org.web;
 import jblog.guohai.org.model.BlogContent;
 import jblog.guohai.org.service.BlogService;
 import jblog.guohai.org.util.MarkdownToHtml;
+import jblog.guohai.org.util.SplitWord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
@@ -101,5 +104,16 @@ public class HomeController {
         model.addAttribute("maxPageNum", blogService.getMaxClassPageNum(classCode));
         model.addAttribute("blog_classes", blogService.getClassOfBlogCountList());
         return "home_class";
+    }
+
+    @RequestMapping(value = "/page/search}")
+    public String getSearchContent(Model model, @RequestBody String searchContent) {
+        if (StringUtils.isEmpty(searchContent)) {
+            return home(model);
+        }
+
+//        List<String> searchKeys = SplitWord.split(searchContent);
+
+        return home(model);
     }
 }
